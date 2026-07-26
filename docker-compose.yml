@@ -5,6 +5,7 @@ services:
       - "8888:80"
     environment:
       - UPLOAD_PASSWORD=8888
+      - PORT=80
     volumes:
       - ./uploads:/app/uploads
     restart: unless-stopped
