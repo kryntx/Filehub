@@ -1,0 +1,10 @@
+services:
+  web:
+    build: .
+    ports:
+      - "8888:80"
+    environment:
+      - UPLOAD_PASSWORD=8888
+    volumes:
+      - ./uploads:/app/uploads
+    restart: unless-stopped
