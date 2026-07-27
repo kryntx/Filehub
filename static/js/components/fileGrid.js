@@ -239,7 +239,16 @@ viewToggle.addEventListener('click', () => {
 
 function clearDrag() {
     _dragIdx = -1;
-    gridEl.querySelectorAll('.dragging, .drag-over').forEach(el => el.classList.remove('dragging', 'drag-over'));
+    gridEl.querySelectorAll('.dragging, .drag-over, .drag-over-before, .drag-over-after').forEach(el => {
+        el.classList.remove('dragging', 'drag-over', 'drag-over-before', 'drag-over-after');
+    });
+}
+
+function markDragTarget(el, clientY) {
+    const rect = el.getBoundingClientRect();
+    const isAfter = clientY > rect.top + rect.height / 2;
+    el.classList.remove('drag-over-before', 'drag-over-after');
+    el.classList.add('drag-over', isAfter ? 'drag-over-after' : 'drag-over-before');
 }
 
 gridEl.addEventListener('dragstart', e => {
@@ -259,12 +268,15 @@ gridEl.addEventListener('dragenter', e => {
     if (related === el) return;
     const overIdx = parseInt(el.dataset.dragIndex);
     if (overIdx === _dragIdx) return;
-    el.classList.add('drag-over');
+    markDragTarget(el, e.clientY);
 });
 
 gridEl.addEventListener('dragover', e => {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
+    const el = e.target.closest('[data-drag-index]');
+    if (!el || _dragIdx < 0 || parseInt(el.dataset.dragIndex) === _dragIdx) return;
+    markDragTarget(el, e.clientY);
 });
 
 gridEl.addEventListener('dragleave', e => {
@@ -272,7 +284,7 @@ gridEl.addEventListener('dragleave', e => {
     if (!el || _dragIdx < 0) return;
     const related = e.relatedTarget ? e.relatedTarget.closest('[data-drag-index]') : null;
     if (related === el) return;
-    el.classList.remove('drag-over');
+    el.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
 });
 
 gridEl.addEventListener('drop', e => {
@@ -312,7 +324,8 @@ gridEl.addEventListener('touchstart', e => {
         timer: setTimeout(() => {
             el.classList.add('dragging');
             const clone = el.cloneNode(true);
-            clone.style.cssText = 'position:fixed;pointer-events:none;opacity:0.7;z-index:9999;transform:scale(1.05) rotate(2deg);width:' + el.offsetWidth + 'px';
+            clone.classList.add('drag-clone');
+            clone.style.cssText = 'position:fixed;pointer-events:none;opacity:0.7;z-index:9999;width:' + el.offsetWidth + 'px';
             clone.style.top = (touch.clientY - el.offsetHeight / 2) + 'px';
             clone.style.left = (touch.clientX - el.offsetWidth / 2) + 'px';
             document.body.appendChild(clone);
@@ -328,11 +341,13 @@ gridEl.addEventListener('touchmove', e => {
     const touch = e.touches[0];
     _touchState.clone.style.left = (touch.clientX - _touchState.clone.offsetWidth / 2) + 'px';
     _touchState.clone.style.top = (touch.clientY - _touchState.clone.offsetHeight / 2) + 'px';
-    gridEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    gridEl.querySelectorAll('.drag-over, .drag-over-before, .drag-over-after').forEach(el => {
+        el.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+    });
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
     const dragEl = target ? target.closest('[data-drag-index]') : null;
     if (dragEl && parseInt(dragEl.dataset.dragIndex) !== _touchState.idx) {
-        dragEl.classList.add('drag-over');
+        markDragTarget(dragEl, touch.clientY);
     }
 }, { passive: false });
 
@@ -360,7 +375,9 @@ gridEl.addEventListener('touchend', e => {
     }
     if (_touchState.clone) _touchState.clone.remove();
     _touchState = null;
-    gridEl.querySelectorAll('.dragging, .drag-over').forEach(el => el.classList.remove('dragging', 'drag-over'));
+    gridEl.querySelectorAll('.dragging, .drag-over, .drag-over-before, .drag-over-after').forEach(el => {
+        el.classList.remove('dragging', 'drag-over', 'drag-over-before', 'drag-over-after');
+    });
 });
 
 gridEl.addEventListener('touchcancel', () => {
@@ -369,5 +386,7 @@ gridEl.addEventListener('touchcancel', () => {
         if (_touchState.clone) _touchState.clone.remove();
         _touchState = null;
     }
-    gridEl.querySelectorAll('.dragging, .drag-over').forEach(el => el.classList.remove('dragging', 'drag-over'));
+    gridEl.querySelectorAll('.dragging, .drag-over, .drag-over-before, .drag-over-after').forEach(el => {
+        el.classList.remove('dragging', 'drag-over', 'drag-over-before', 'drag-over-after');
+    });
 });

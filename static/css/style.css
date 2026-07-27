@@ -202,10 +202,18 @@ body {
     grid-template-columns: 1fr;
     gap: 2px;
 }
-.file-card[draggable="true"] { cursor: grab; }
+.file-card[draggable="true"] { cursor: grab; transform-origin: center; }
 .file-card[draggable="true"]:active { cursor: grabbing; }
-.file-card.dragging { opacity: 0.35; }
-.file-card.drag-over { outline: 2px solid #7b2ff7; outline-offset: -2px; border-radius: 14px; }
+.file-card.dragging {
+    opacity: 0.45;
+    animation: dragSqueeze .42s cubic-bezier(.22,1,.36,1) infinite alternate;
+}
+.file-card.drag-over {
+    outline: 2px solid #7b2ff7; outline-offset: -2px; border-radius: 14px;
+    animation: dragSlotPulse .36s cubic-bezier(.18,.89,.32,1.28);
+}
+.file-card.drag-over-before { transform: translateY(-6px) scale(.98, 1.04); }
+.file-card.drag-over-after { transform: translateY(6px) scale(.98, 1.04); }
 
 .file-card {
     background: var(--card); border: 1px solid var(--card-border);
@@ -256,10 +264,18 @@ body {
 }
 .list-table tr:last-child td { border-bottom: none; }
 .list-table tr:hover td { background: var(--row-hover); }
-.list-table tr[draggable="true"] { cursor: grab; }
+.list-table tr[draggable="true"] { cursor: grab; transform-origin: center; }
 .list-table tr[draggable="true"]:active { cursor: grabbing; }
-.list-table tr.dragging { opacity: 0.35; }
-.list-table tr.drag-over { outline: 2px solid #7b2ff7; outline-offset: -2px; border-radius: 8px; }
+.list-table tr.dragging {
+    opacity: 0.45;
+    animation: dragRowSqueeze .42s cubic-bezier(.22,1,.36,1) infinite alternate;
+}
+.list-table tr.drag-over {
+    outline: 2px solid #7b2ff7; outline-offset: -2px; border-radius: 8px;
+    animation: dragSlotPulse .36s cubic-bezier(.18,.89,.32,1.28);
+}
+.list-table tr.drag-over-before { transform: translateY(-4px) scaleY(1.04); }
+.list-table tr.drag-over-after { transform: translateY(4px) scaleY(1.04); }
 .list-table .col-icon { width: 36px; text-align: center; }
 .list-table .col-name { width: auto; }
 .list-table .col-size { width: 90px; }
@@ -271,6 +287,49 @@ body {
 }
 .list-table .list-name:hover { color: var(--inp-focus); }
 .list-table .list-actions { display: flex; gap: 4px; justify-content: flex-end; }
+
+.drag-clone {
+    animation: dragLift .2s cubic-bezier(.18,.89,.32,1.28) both;
+    box-shadow: 0 18px 42px rgba(0,0,0,.28);
+}
+
+@keyframes dragSqueeze {
+    from { transform: scale(.96, 1.04) rotate(-.4deg); }
+    to { transform: scale(1.03, .97) rotate(.4deg); }
+}
+
+@keyframes dragRowSqueeze {
+    from { transform: scale(.99, 1.08); }
+    to { transform: scale(1.01, .96); }
+}
+
+@keyframes dragSlotPulse {
+    0% { filter: saturate(1); }
+    55% { filter: saturate(1.35); }
+    100% { filter: saturate(1); }
+}
+
+@keyframes dragLift {
+    from { transform: scale(.96, 1.06) rotate(0deg); }
+    to { transform: scale(1.05, .98) rotate(2deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .file-card.dragging,
+    .file-card.drag-over,
+    .list-table tr.dragging,
+    .list-table tr.drag-over,
+    .drag-clone {
+        animation: none;
+    }
+
+    .file-card.drag-over-before,
+    .file-card.drag-over-after,
+    .list-table tr.drag-over-before,
+    .list-table tr.drag-over-after {
+        transform: none;
+    }
+}
 
 /* ============ Dropdown Menu ============ */
 .dropdown-container {
