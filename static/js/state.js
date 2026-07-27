@@ -5,6 +5,8 @@
 
 const STORAGE_KEYS = {
     viewMode: 'viewMode',
+    colorMode: 'colorMode',
+    effectTheme: 'effectTheme',
     theme: 'theme',
     previewWrap: 'previewWrap',
 };
@@ -25,14 +27,40 @@ const State = {
         this._emit('viewMode', v);
     },
 
+    get colorMode() {
+        const stored = localStorage.getItem(STORAGE_KEYS.colorMode);
+        if (stored === 'system' || stored === 'light' || stored === 'dark') return stored;
+
+        const legacy = localStorage.getItem(STORAGE_KEYS.theme);
+        if (legacy === 'light' || legacy === 'dark') return legacy;
+
+        return 'system';
+    },
+    set colorMode(v) {
+        const next = v === 'light' || v === 'dark' ? v : 'system';
+        localStorage.setItem(STORAGE_KEYS.colorMode, next);
+        localStorage.removeItem(STORAGE_KEYS.theme);
+        this._emit('colorMode', next);
+        this._emit('theme', this.theme);
+    },
+
+    get effectTheme() {
+        return localStorage.getItem(STORAGE_KEYS.effectTheme) === 'blur' ? 'blur' : 'liquid';
+    },
+    set effectTheme(v) {
+        const next = v === 'blur' ? 'blur' : 'liquid';
+        localStorage.setItem(STORAGE_KEYS.effectTheme, next);
+        this._emit('effectTheme', next);
+    },
+
     get theme() {
-        const stored = localStorage.getItem(STORAGE_KEYS.theme);
-        if (stored === 'dark' || stored === 'light') return stored;
-        return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        if (this.colorMode === 'system') {
+            return window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+        }
+        return this.colorMode;
     },
     set theme(v) {
-        localStorage.setItem(STORAGE_KEYS.theme, v);
-        this._emit('theme', v);
+        this.colorMode = v === 'light' ? 'light' : 'dark';
     },
 
     get wrapEnabled() {

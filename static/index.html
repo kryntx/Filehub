@@ -19,7 +19,17 @@
                     </div>
                 </div>
                 <div class="header-right">
-                    <button class="btn-icon" id="themeToggle" title="切换主题">🌙</button>
+                    <div class="theme-panel" id="themePanel">
+                        <div class="segmented" role="group" aria-label="视觉主题">
+                            <button class="seg-btn" data-effect-option="liquid" title="液态玻璃" aria-label="液态玻璃">◌</button>
+                            <button class="seg-btn" data-effect-option="blur" title="高斯模糊" aria-label="高斯模糊">◍</button>
+                        </div>
+                        <div class="segmented" role="group" aria-label="颜色模式">
+                            <button class="seg-btn" data-color-mode="system" title="跟随设备" aria-label="跟随设备">◐</button>
+                            <button class="seg-btn" data-color-mode="light" title="日间模式" aria-label="日间模式">☀</button>
+                            <button class="seg-btn" data-color-mode="dark" title="夜间模式" aria-label="夜间模式">☾</button>
+                        </div>
+                    </div>
                     <button class="btn btn-primary" id="uploadBtn">+ 上传</button>
                 </div>
             </div>
