@@ -25,25 +25,77 @@ def _unique_target(fp: str, safe: str) -> tuple[str, str]:
     return target, os.path.basename(target)
 
 
+def _find_resume_target(fp: str, safe: str) -> str | None:
+    """Find existing file for resume, checking original and _N variants."""
+    target = os.path.join(fp, safe)
+    if os.path.exists(target):
+        return target
+    root, ext = os.path.splitext(safe)
+    for counter in range(1, 100):
+        alt = os.path.join(fp, f'{root}_{counter}{ext}')
+        if os.path.exists(alt):
+            return alt
+    return None
+
+
+CHUNK_SIZE = 65536  # 64KB
+
+
+def _stream_to_file(stream, target, mode='wb'):
+    """Read from stream in chunks and write to target file."""
+    with open(target, mode) as fh:
+        while True:
+            chunk = stream.read(CHUNK_SIZE)
+            if not chunk:
+                break
+            fh.write(chunk)
+
+
 @bp.route('/api/upload', methods=['POST'])
 @require_password
 def upload():
-    sub = (request.form.get('path') or '').strip()
+    sub = (request.form.get('path') or request.args.get('path') or '').strip()
     base = current_app.config['UPLOAD_DIR']
     fp = resolve(base, sub)
     if fp is None:
         raise BadRequestError('非法路径')
     os.makedirs(fp, exist_ok=True)
 
-    if 'file' not in request.files:
-        raise BadRequestError('请选择文件')
-    f = request.files['file']
-    if not f.filename:
-        raise BadRequestError('请选择文件')
+    offset_str = request.headers.get('X-Upload-Offset') or request.args.get('offset') or '0'
+    try:
+        offset = int(offset_str) if offset_str else 0
+    except (ValueError, TypeError):
+        offset = 0
 
-    safe = safe_name(f.filename)
-    target, basename = _unique_target(fp, safe)
-    f.save(target)
+    raw_filename = (
+        request.args.get('filename')
+        or request.headers.get('X-Upload-Filename')
+        or ''
+    )
+
+    if offset > 0:
+        # Resume upload — append to existing file
+        if not raw_filename:
+            raise BadRequestError('缺少文件名')
+        safe = safe_name(urllib.parse.unquote(raw_filename))
+        target = _find_resume_target(fp, safe)
+        if target is None:
+            raise BadRequestError('续传文件不存在')
+        _stream_to_file(request.stream, target, 'ab')
+        basename = os.path.basename(target)
+    elif 'file' in request.files and request.files['file'].filename:
+        # FormData upload (legacy)
+        f = request.files['file']
+        safe = safe_name(f.filename)
+        target, basename = _unique_target(fp, safe)
+        f.save(target)
+    else:
+        # Raw binary upload
+        if not raw_filename:
+            raise BadRequestError('请选择文件')
+        safe = safe_name(urllib.parse.unquote(raw_filename))
+        target, basename = _unique_target(fp, safe)
+        _stream_to_file(request.stream, target, 'wb')
 
     rel = os.path.join(sub, basename).replace('\\', '/')
     return jsonify({'success': True, 'file': rel})

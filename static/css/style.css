@@ -100,6 +100,24 @@ body {
 }
 .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+/* Storage indicator */
+.storage-indicator {
+    display: flex; align-items: center; gap: 8px;
+    padding: 4px 10px; border-radius: 6px;
+    background: var(--btn2-bg); border: 1px solid var(--btn2-border);
+    white-space: nowrap;
+}
+.storage-bar {
+    width: 60px; height: 4px;
+    background: var(--prog-bg); border-radius: 2px; overflow: hidden;
+}
+.storage-fill {
+    height: 100%; border-radius: 2px;
+    background: linear-gradient(135deg, #00d4ff, #7b2ff7);
+    transition: width .4s;
+}
+.storage-text { font-size: 11px; color: var(--text2); }
 .logo { display: flex; align-items: center; gap: 10px; }
 .logo-icon { font-size: 24px; line-height: 1; }
 .logo h1 {
@@ -184,6 +202,10 @@ body {
     grid-template-columns: 1fr;
     gap: 2px;
 }
+.file-card[draggable="true"] { cursor: grab; }
+.file-card[draggable="true"]:active { cursor: grabbing; }
+.file-card.dragging { opacity: 0.35; }
+.file-card.drag-over { outline: 2px solid #7b2ff7; outline-offset: -2px; border-radius: 14px; }
 
 .file-card {
     background: var(--card); border: 1px solid var(--card-border);
@@ -234,6 +256,10 @@ body {
 }
 .list-table tr:last-child td { border-bottom: none; }
 .list-table tr:hover td { background: var(--row-hover); }
+.list-table tr[draggable="true"] { cursor: grab; }
+.list-table tr[draggable="true"]:active { cursor: grabbing; }
+.list-table tr.dragging { opacity: 0.35; }
+.list-table tr.drag-over { outline: 2px solid #7b2ff7; outline-offset: -2px; border-radius: 8px; }
 .list-table .col-icon { width: 36px; text-align: center; }
 .list-table .col-name { width: auto; }
 .list-table .col-size { width: 90px; }
@@ -378,6 +404,29 @@ body {
 .progress-bar { height: 6px; background: var(--prog-bg); border-radius: 3px; overflow: hidden; margin-bottom: 8px; }
 .progress-fill { height: 100%; background: linear-gradient(135deg,#00d4ff,#7b2ff7); border-radius: 3px; width: 0%; transition: width .3s; }
 .progress-text { font-size: 13px; color: var(--text2); text-align: center; }
+.upload-overall { margin-bottom: 12px; }
+.upload-file-list { max-height: 270px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+.upload-file-item {
+    display: flex; flex-direction: column; gap: 6px;
+    padding: 10px 12px; background: var(--drop-hover); border-radius: 8px;
+}
+.upload-file-info { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.upload-file-name { flex: 1; font-size: 13px; font-weight: 500; color: var(--text1); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.upload-file-size { font-size: 11px; color: var(--text3); flex-shrink: 0; }
+.upload-del-btn {
+    background: none; border: none; color: var(--text3); font-size: 20px;
+    cursor: pointer; padding: 0 2px; line-height: 1; flex-shrink: 0;
+    transition: color .2s;
+}
+.upload-del-btn:hover { color: #ff4757; }
+.upload-file-bottom { display: flex; align-items: center; gap: 8px; }
+.upload-file-progress { flex: 1; min-width: 0; }
+.upload-file-progress .progress-bar { height: 4px; margin-bottom: 0; }
+.upload-file-status { font-size: 12px; color: var(--text2); white-space: nowrap; flex-shrink: 0; }
+.upload-file-status.completed { color: #2ed573; }
+.upload-file-status.error { color: #ff4757; }
+.upload-file-status.paused { color: #ffa502; }
+.upload-file-item .btn { font-size: 12px; padding: 2px 8px; flex-shrink: 0; }
 
 /* ============ Upload URL ============ */
 .upload-divider {
@@ -421,6 +470,10 @@ body {
 .preview-textarea.preview-nowrap { white-space: pre; overflow-x: auto; }
 .preview-content.preview-image { background: none; border: none; padding: 0; text-align: center; white-space: normal; font-family: inherit; }
 .preview-content.preview-image img { max-width: 100%; max-height: 70vh; display: block; margin: 0 auto; border-radius: 8px; }
+.preview-content.preview-video { background: none; border: none; padding: 0; text-align: center; white-space: normal; }
+.preview-content.preview-video video { max-width: 100%; max-height: 70vh; border-radius: 8px; }
+.preview-content.preview-audio { background: none; border: none; padding: 0; text-align: center; white-space: normal; }
+.preview-content.preview-audio audio { width: 100%; max-width: 500px; margin: 20px auto; }
 .preview-textarea {
     width: 100%; min-height: 300px; font-family: 'JetBrains Mono','Fira Code','Consolas',monospace;
     font-size: 13px; line-height: 1.6; tab-size: 4;

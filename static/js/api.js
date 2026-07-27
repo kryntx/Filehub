@@ -22,7 +22,14 @@ async function request(method, url, { body = null, auth = false, raw = false } =
     const res = await fetch(url, opts);
     const data = await res.json();
 
-    if (!res.ok) throw new ApiError(data.error || '请求失败', res.status);
+    if (!res.ok) {
+        // Wrong password — clear so next action re-prompts
+        if (auth && res.status === 403) {
+            State.password = '';
+            document.cookie = 'uploadPassword=; expires=Thu, 01 Jan 1970 00:00:00 GMT; path=/; SameSite=Lax';
+        }
+        throw new ApiError(data.error || '请求失败', res.status);
+    }
     return data;
 }
 
@@ -31,6 +38,10 @@ async function request(method, url, { body = null, auth = false, raw = false } =
 export function fetchFiles(path = '') {
     const q = path ? '?path=' + encodeURIComponent(path) : '';
     return request('GET', '/api/files' + q);
+}
+
+export function fetchStorageStats() {
+    return request('GET', '/api/storage');
 }
 
 export function downloadUrl(path) {
@@ -74,6 +85,10 @@ export function renameItem(path, name, newName) {
 
 export function saveFile(path, name, content) {
     return request('PUT', '/api/save', { body: { path, name, content }, auth: true });
+}
+
+export function saveOrder(path, order) {
+    return request('PUT', '/api/order', { body: { path, order }, auth: true });
 }
 
 export function deleteItem(path, name) {

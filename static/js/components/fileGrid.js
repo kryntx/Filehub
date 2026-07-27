@@ -17,6 +17,13 @@ const loadingEl = document.getElementById('loading');
 const viewToggle = document.getElementById('viewToggle');
 
 let cachedFiles = [];
+let _dragIdx = -1;
+
+/** Save current file order to server. */
+function saveOrder() {
+    const order = cachedFiles.map(f => f.name);
+    api.saveOrder(State.currentPath, order).catch(() => {});
+}
 
 export async function refresh() {
     try {
@@ -64,16 +71,16 @@ function renderGrid(files) {
         const cp = State.currentPath;
 
         const actions = isDir
-            ? `<a href="${api.downloadZipUrl(cp ? cp + '/' + en : en)}" class="btn btn-primary btn-sm btn-download" download>下载</a>
+            ? `<a href="${api.downloadZipUrl(cp ? cp + '/' + f.name : f.name)}" class="btn btn-primary btn-sm btn-download" download>下载</a>
                <button class="btn btn-danger btn-sm" data-act="deleteDir" data-name="${en}">删除</button>
                <button class="btn btn-secondary btn-sm" data-act="rename" data-name="${en}">重命名</button>`
-            : `<a href="${api.downloadUrl(cp ? cp + '/' + en : en)}" class="btn btn-primary btn-sm btn-download" download>下载</a>
+            : `<a href="${api.downloadUrl(cp ? cp + '/' + f.name : f.name)}" class="btn btn-primary btn-sm btn-download" download>下载</a>
                <button class="btn btn-secondary btn-sm" data-preview="${en}">预览</button>
                <button class="btn btn-danger btn-sm" data-act="deleteFile" data-name="${en}">删除</button>
                <button class="btn btn-secondary btn-sm" data-act="rename" data-name="${en}">重命名</button>`;
 
-        return `<div class="file-card ${isDir ? 'card-dir' : ''}">
-            <div class="card-body" ${isDir ? 'data-dir="' + en + '"' : ''}>
+        return `<div class="file-card ${isDir ? 'card-dir' : ''}" draggable="true" data-drag-index="${i}">
+            <div class="card-body" ${isDir ? 'data-dir="' + en + '"' : 'data-file="' + en + '"'}>
                 <div class="file-icon">${icon}</div>
                 <div class="file-name" title="${name}">${name}</div>
                 ${size ? '<div class="file-size">' + size + '</div>' : ''}
@@ -83,14 +90,6 @@ function renderGrid(files) {
         </div>`;
     }).join('');
 
-    // Dir click handler
-    gridEl.querySelectorAll('.card-body[data-dir]').forEach(el => {
-        el.addEventListener('click', e => {
-            if (e.target.closest('.file-actions, .btn')) return;
-            const cp = State.currentPath;
-            State.currentPath = cp ? cp + '/' + dec(el.dataset.dir) : dec(el.dataset.dir);
-        });
-    });
 }
 
 /* ---- List / Table view ---- */
@@ -110,17 +109,17 @@ function renderList(files) {
         const cp = State.currentPath;
 
         let ddItems = isDir
-            ? `<a href="${api.downloadZipUrl(cp ? cp + '/' + en : en)}" class="dropdown-item" download>下载</a>
+            ? `<a href="${api.downloadZipUrl(cp ? cp + '/' + f.name : f.name)}" class="dropdown-item" download>下载</a>
                <button class="dropdown-item dropdown-danger" data-act="deleteDir" data-name="${en}">删除</button>
                <button class="dropdown-item" data-act="rename" data-name="${en}">重命名</button>`
-            : `<a href="${api.downloadUrl(cp ? cp + '/' + en : en)}" class="dropdown-item" download>下载</a>
+            : `<a href="${api.downloadUrl(cp ? cp + '/' + f.name : f.name)}" class="dropdown-item" download>下载</a>
                <button class="dropdown-item" data-preview="${en}">预览</button>
                <button class="dropdown-item dropdown-danger" data-act="deleteFile" data-name="${en}">删除</button>
                <button class="dropdown-item" data-act="rename" data-name="${en}">重命名</button>`;
 
-        html += `<tr>
-            <td class="col-icon">${icon}</td>
-            <td class="col-name"><span class="list-name" data-dir="${isDir ? en : ''}"><span class="scroll-inner">${name}</span></span></td>
+        html += `<tr draggable="true" data-drag-index="${i}">
+            <td class="col-icon" ${!isDir ? 'data-file="' + en + '"' : ''}>${icon}</td>
+            <td class="col-name"><span class="list-name" ${isDir ? 'data-dir="' + en + '"' : 'data-file="' + en + '"'}><span class="scroll-inner">${name}</span></span></td>
             <td class="col-size">${size}</td>
             <td class="col-time"><span class="scroll-inner">${time}</span></td>
             <td class="col-actions">
@@ -133,14 +132,6 @@ function renderList(files) {
     }
     html += '</tbody></table>';
     gridEl.innerHTML = html;
-
-    // Dir click in list view
-    gridEl.querySelectorAll('.list-name[data-dir]').forEach(el => {
-        el.addEventListener('click', () => {
-            const cp = State.currentPath;
-            State.currentPath = cp ? cp + '/' + dec(el.dataset.dir) : dec(el.dataset.dir);
-        });
-    });
 
     // Auto-scroll for overflow text
     gridEl.querySelectorAll('.col-name, .col-time').forEach(cell => {
@@ -184,6 +175,25 @@ gridEl.addEventListener('click', async e => {
         return;
     }
 
+    // Directory click — navigate into folder
+    const dirEl = e.target.closest('[data-dir]');
+    if (dirEl) {
+        if (e.target.closest('.file-actions, .btn, .dropdown-container')) return;
+        closeAllDropdowns();
+        const cp = State.currentPath;
+        State.currentPath = cp ? cp + '/' + dec(dirEl.dataset.dir) : dec(dirEl.dataset.dir);
+        return;
+    }
+
+    // File name/icon click — open preview
+    const fileEl = e.target.closest('[data-file]');
+    if (fileEl) {
+        if (e.target.closest('.file-actions, .btn, .dropdown-container')) return;
+        closeAllDropdowns();
+        previewModal.open(dec(fileEl.dataset.file));
+        return;
+    }
+
     // Action buttons (delete, rename)
     const act = e.target.closest('[data-act]');
     if (!act) { closeAllDropdowns(); return; }
@@ -223,4 +233,141 @@ viewToggle.addEventListener('click', () => {
     State.viewMode = next;
     viewToggle.textContent = next === 'list' ? '⊞' : '☰';
     render(cachedFiles);
+});
+
+/* ---- Drag and drop sorting ---- */
+
+function clearDrag() {
+    _dragIdx = -1;
+    gridEl.querySelectorAll('.dragging, .drag-over').forEach(el => el.classList.remove('dragging', 'drag-over'));
+}
+
+gridEl.addEventListener('dragstart', e => {
+    const el = e.target.closest('[data-drag-index]');
+    if (!el) return;
+    _dragIdx = parseInt(el.dataset.dragIndex);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', '');
+    el.classList.add('dragging');
+});
+
+gridEl.addEventListener('dragenter', e => {
+    e.preventDefault();
+    const el = e.target.closest('[data-drag-index]');
+    if (!el || _dragIdx < 0) return;
+    const related = e.relatedTarget?.closest('[data-drag-index]');
+    if (related === el) return;
+    const overIdx = parseInt(el.dataset.dragIndex);
+    if (overIdx === _dragIdx) return;
+    el.classList.add('drag-over');
+});
+
+gridEl.addEventListener('dragover', e => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'move';
+});
+
+gridEl.addEventListener('dragleave', e => {
+    const el = e.target.closest('[data-drag-index]');
+    if (!el || _dragIdx < 0) return;
+    const related = e.relatedTarget?.closest('[data-drag-index]');
+    if (related === el) return;
+    el.classList.remove('drag-over');
+});
+
+gridEl.addEventListener('drop', e => {
+    e.preventDefault();
+    const el = e.target.closest('[data-drag-index]');
+    if (!el || _dragIdx < 0) return;
+    const toIdx = parseInt(el.dataset.dragIndex);
+    if (toIdx !== _dragIdx) {
+        const rect = el.getBoundingClientRect();
+        const midY = rect.top + rect.height / 2;
+        let insertIdx = toIdx;
+        if (e.clientY > midY) insertIdx = toIdx + 1;
+        if (insertIdx > _dragIdx) insertIdx--;
+        const [moved] = cachedFiles.splice(_dragIdx, 1);
+        cachedFiles.splice(insertIdx, 0, moved);
+        render(cachedFiles);
+        saveOrder();
+    }
+    clearDrag();
+});
+
+gridEl.addEventListener('dragend', clearDrag);
+
+/* ---- Touch long-press drag support ---- */
+
+let _touchState = null;
+
+gridEl.addEventListener('touchstart', e => {
+    const el = e.target.closest('[data-drag-index]');
+    if (!el || e.target.closest('.file-actions, .btn, .dropdown-container, thead, .dropdown-menu')) return;
+    const touch = e.touches[0];
+    _touchState = {
+        idx: parseInt(el.dataset.dragIndex),
+        el,
+        startX: touch.clientX,
+        startY: touch.clientY,
+        timer: setTimeout(() => {
+            el.classList.add('dragging');
+            const clone = el.cloneNode(true);
+            clone.style.cssText = 'position:fixed;pointer-events:none;opacity:0.7;z-index:9999;transform:scale(1.05) rotate(2deg);width:' + el.offsetWidth + 'px';
+            clone.style.top = (touch.clientY - el.offsetHeight / 2) + 'px';
+            clone.style.left = (touch.clientX - el.offsetWidth / 2) + 'px';
+            document.body.appendChild(clone);
+            _touchState.clone = clone;
+            _touchState.active = true;
+        }, 400)
+    };
+}, { passive: true });
+
+gridEl.addEventListener('touchmove', e => {
+    if (!_touchState?.active) return;
+    e.preventDefault();
+    const touch = e.touches[0];
+    _touchState.clone.style.left = (touch.clientX - _touchState.clone.offsetWidth / 2) + 'px';
+    _touchState.clone.style.top = (touch.clientY - _touchState.clone.offsetHeight / 2) + 'px';
+    gridEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const dragEl = target?.closest('[data-drag-index]');
+    if (dragEl && parseInt(dragEl.dataset.dragIndex) !== _touchState.idx) {
+        dragEl.classList.add('drag-over');
+    }
+}, { passive: false });
+
+gridEl.addEventListener('touchend', e => {
+    if (!_touchState) return;
+    clearTimeout(_touchState.timer);
+    if (_touchState.active) {
+        const touch = e.changedTouches[0];
+        const target = document.elementFromPoint(touch.clientX, touch.clientY);
+        const dragEl = target?.closest('[data-drag-index]');
+        if (dragEl) {
+            const toIdx = parseInt(dragEl.dataset.dragIndex);
+            if (toIdx !== _touchState.idx) {
+                const rect = dragEl.getBoundingClientRect();
+                const midY = rect.top + rect.height / 2;
+                let insertIdx = toIdx;
+                if (touch.clientY > midY) insertIdx = toIdx + 1;
+                if (insertIdx > _touchState.idx) insertIdx--;
+                const [moved] = cachedFiles.splice(_touchState.idx, 1);
+                cachedFiles.splice(insertIdx, 0, moved);
+                render(cachedFiles);
+                saveOrder();
+            }
+        }
+    }
+    if (_touchState.clone) _touchState.clone.remove();
+    _touchState = null;
+    gridEl.querySelectorAll('.dragging, .drag-over').forEach(el => el.classList.remove('dragging', 'drag-over'));
+});
+
+gridEl.addEventListener('touchcancel', () => {
+    if (_touchState) {
+        clearTimeout(_touchState.timer);
+        if (_touchState.clone) _touchState.clone.remove();
+        _touchState = null;
+    }
+    gridEl.querySelectorAll('.dragging, .drag-over').forEach(el => el.classList.remove('dragging', 'drag-over'));
 });

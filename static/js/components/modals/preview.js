@@ -7,7 +7,17 @@ import * as toast from '../toast.js';
 import { escapeHtml, enc } from '../../utils.js';
 import { prompt } from './password.js';
 
-const modal = initModal('previewModal');
+const modal = initModal('previewModal', {
+    onClose() {
+        // Stop any playing media
+        contentEl.querySelectorAll('video, audio').forEach(el => {
+            el.pause();
+            el.currentTime = 0;
+            el.removeAttribute('src');
+            el.load();
+        });
+    },
+});
 const contentEl = document.getElementById('previewContent');
 const textareaEl = document.getElementById('previewTextarea');
 const titleEl = document.getElementById('previewTitle');
@@ -23,7 +33,7 @@ let isEditing = false;
 
 function buildPath(filename) {
     const cp = State.currentPath;
-    return cp ? enc(cp) + '/' + enc(filename) : enc(filename);
+    return cp ? cp + '/' + filename : filename;
 }
 
 function applyWrap() {
@@ -66,13 +76,31 @@ export async function open(filename) {
         return;
     }
 
-    // Text preview
+    // Video preview
+    if (['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.avi'].includes(ext)) {
+        contentEl.className = 'preview-content preview-video';
+        contentEl.innerHTML = '<video controls autoplay src="' + api.downloadUrl(q) + '"></video>';
+        return;
+    }
+
+    // Audio preview
+    if (['.mp3', '.wav', '.flac', '.aac', '.ogg'].includes(ext)) {
+        contentEl.className = 'preview-content preview-audio';
+        contentEl.innerHTML = '<audio controls src="' + api.downloadUrl(q) + '"></audio>';
+        return;
+    }
+
+    // Text preview — 默认进入编辑模式
     contentEl.className = 'preview-content';
     try {
         const data = await api.fetchPreview(buildPath(filename));
         contentEl.textContent = data.content;
         textareaEl.value = data.content;
-        editBtn.style.display = 'inline-flex';
+        contentEl.style.display = 'none';
+        textareaEl.style.display = 'block';
+        editBtn.style.display = 'none';
+        saveBtn.style.display = 'inline-flex';
+        isEditing = true;
         if (data.truncated) truncatedEl.style.display = 'block';
         applyWrap();
     } catch (e) {

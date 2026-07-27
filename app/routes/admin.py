@@ -1,5 +1,6 @@
-"""Password-protected admin routes: mkdir, newfile, rename, save, delete."""
+"""Password-protected admin routes: mkdir, newfile, rename, save, delete, order."""
 
+import json
 import os
 
 from flask import Blueprint, current_app, jsonify, request
@@ -146,5 +147,29 @@ def delete():
             raise BadRequestError('文件夹非空，无法删除')
     else:
         os.remove(target)
+
+    return jsonify({'success': True})
+
+
+@bp.route('/api/order', methods=['PUT'])
+@require_password
+def save_order():
+    data = request.get_json(silent=True) or {}
+    sub = (data.get('path') or '').strip()
+    order = data.get('order', [])
+    if not isinstance(order, list):
+        raise BadRequestError('参数错误')
+
+    base = current_app.config['UPLOAD_DIR']
+    fp = resolve(base, sub)
+    if fp is None:
+        raise BadRequestError('非法路径')
+
+    order_file = os.path.join(fp, '.filehub_order')
+    try:
+        with open(order_file, 'w', encoding='utf-8') as f:
+            json.dump(order, f, ensure_ascii=False)
+    except OSError as e:
+        raise BadRequestError(f'保存失败: {e}')
 
     return jsonify({'success': True})

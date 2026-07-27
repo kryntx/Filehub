@@ -1,6 +1,7 @@
-"""Public read-only routes: list, download, preview, download-zip."""
+"""Public read-only routes: list, download, preview, download-zip, storage."""
 
 import io
+import json
 import os
 import time
 import zipfile
@@ -36,8 +37,13 @@ def list_files():
     if not os.path.isdir(fp):
         raise BadRequestError('不是目录')
 
+    # 系统内部目录，不对外暴露
+    SKIP_DIRS = {'.chunks'}
+
     items: list[dict] = []
-    for f in sorted(os.listdir(fp)):
+    for f in os.listdir(fp):
+        if f in SKIP_DIRS or f == '.filehub_order':
+            continue
         full = os.path.join(fp, f)
         if not os.path.exists(full):
             continue
@@ -51,8 +57,47 @@ def list_files():
             'mtime': time.strftime('%Y-%m-%dT%H:%M:%S', time.localtime(stat.st_mtime)),
             'ext': ext.lower() or '',
         })
-    items.sort(key=lambda x: (0 if x['type'] == 'dir' else 1, x['name'].lower()))
+
+    # Check for custom order file
+    order_file = os.path.join(fp, '.filehub_order')
+    order_map: dict[str, int] = {}
+    if os.path.exists(order_file):
+        try:
+            with open(order_file, 'r', encoding='utf-8') as f:
+                order_list = json.load(f)
+                order_map = {name: i for i, name in enumerate(order_list)}
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    if order_map:
+        def sort_key(x):
+            pos = order_map.get(x['name'])
+            if pos is not None:
+                return (0, pos)
+            return (1, 0 if x['type'] == 'dir' else 1, x['name'].lower())
+    else:
+        def sort_key(x):
+            return (0 if x['type'] == 'dir' else 1, x['name'].lower())
+
+    items.sort(key=sort_key)
     return jsonify({'files': items, 'path': sub})
+
+
+@bp.route('/api/storage')
+def storage_stats():
+    base = current_app.config['UPLOAD_DIR']
+    # Walk all files under upload dir and sum sizes
+    used = 0
+    for dirpath, _dirnames, filenames in os.walk(base):
+        for f in filenames:
+            try:
+                fp = os.path.join(dirpath, f)
+                used += os.path.getsize(fp)
+            except OSError:
+                pass
+    # 32 GB quota for uploads
+    total = 32 * 1024 * 1024 * 1024
+    return jsonify({'used': used, 'total': total, 'percent': round(used / total * 100, 1)})
 
 
 @bp.route('/download/<path:filename>')

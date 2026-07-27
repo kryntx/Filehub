@@ -33,6 +33,12 @@
                     <div class="toolbar-left">
                         <span class="file-count" id="fileCount">共 0 项</span>
                     </div>
+                    <div class="storage-indicator" id="storageIndicator">
+                        <div class="storage-bar">
+                            <div class="storage-fill" id="storageFill"></div>
+                        </div>
+                        <span class="storage-text" id="storageText">- / -</span>
+                    </div>
                     <div class="toolbar-right">
                         <button class="btn-icon" id="newFolderBtn" title="新建文件夹">📁</button>
                         <button class="btn-icon" id="newFileBtn" title="新建文件">📄</button>
@@ -89,10 +95,13 @@
                     <input type="file" id="fileInput" class="file-input" multiple>
                 </div>
                 <div class="upload-progress" id="uploadProgress" style="display:none">
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="progressFill"></div>
+                    <div class="upload-overall">
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill"></div>
+                        </div>
+                        <p class="progress-text" id="progressText">准备上传...</p>
                     </div>
-                    <p class="progress-text" id="progressText">上传中...</p>
+                    <div class="upload-file-list" id="uploadFileList"></div>
                 </div>
                 <p class="error-msg" id="uploadError" style="display:none"></p>
                 <div class="upload-divider"><span>或者</span></div>
@@ -104,9 +113,6 @@
                     <p class="progress-text" id="urlProgressText">从链接下载中...</p>
                 </div>
                 <p class="error-msg" id="urlError" style="display:none"></p>
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" id="uploadModalCancel">取消</button>
             </div>
         </div>
     </div>
@@ -194,7 +200,6 @@
                 <div class="preview-footer-right">
                     <button class="btn btn-primary btn-sm" id="previewSaveBtn" style="display:none">保存</button>
                     <a class="btn btn-primary btn-sm" id="previewDownloadBtn" download>下载</a>
-                    <button class="btn btn-secondary" id="previewCloseBtn">关闭</button>
                 </div>
             </div>
         </div>
@@ -203,6 +208,6 @@
     <!-- Toast -->
     <div class="toast" id="toast"></div>
 
-    <script type="module" src="js/app.js"></script>
+    <script type="module" src="js/app.js?v=3"></script>
 </body>
 </html>

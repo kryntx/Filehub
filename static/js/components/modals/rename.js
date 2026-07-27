@@ -23,7 +23,7 @@ export async function open(name, skipPwd = false) {
     input.value = name;
     errorEl.style.display = 'none';
     modal.open();
-    setTimeout(() => { input.focus(); input.select(); }, 100);
+    setTimeout(() => { input.focus(); }, 100);
 }
 
 document.getElementById('renameModalConfirm').addEventListener('click', async () => {
