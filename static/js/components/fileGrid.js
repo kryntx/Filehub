@@ -61,7 +61,7 @@ function render(files) {
 /* ---- Icon / Grid view ---- */
 
 function renderGrid(files) {
-    gridEl.innerHTML = files.map(f => {
+    gridEl.innerHTML = files.map((f, i) => {
         const icon = getIcon(f.ext, f.type);
         const isDir = f.type === 'dir';
         const name = escapeHtml(f.name);
@@ -99,7 +99,7 @@ function renderList(files) {
         '<th class="col-icon"></th><th class="col-name">名称</th><th class="col-size">大小</th><th class="col-time">时间</th><th class="col-actions">操作</th>' +
         '</tr></thead><tbody>';
 
-    for (const f of files) {
+    for (const [i, f] of files.entries()) {
         const icon = getIcon(f.ext, f.type);
         const isDir = f.type === 'dir';
         const name = escapeHtml(f.name);
@@ -255,7 +255,7 @@ gridEl.addEventListener('dragenter', e => {
     e.preventDefault();
     const el = e.target.closest('[data-drag-index]');
     if (!el || _dragIdx < 0) return;
-    const related = e.relatedTarget?.closest('[data-drag-index]');
+    const related = e.relatedTarget ? e.relatedTarget.closest('[data-drag-index]') : null;
     if (related === el) return;
     const overIdx = parseInt(el.dataset.dragIndex);
     if (overIdx === _dragIdx) return;
@@ -270,7 +270,7 @@ gridEl.addEventListener('dragover', e => {
 gridEl.addEventListener('dragleave', e => {
     const el = e.target.closest('[data-drag-index]');
     if (!el || _dragIdx < 0) return;
-    const related = e.relatedTarget?.closest('[data-drag-index]');
+    const related = e.relatedTarget ? e.relatedTarget.closest('[data-drag-index]') : null;
     if (related === el) return;
     el.classList.remove('drag-over');
 });
@@ -323,14 +323,14 @@ gridEl.addEventListener('touchstart', e => {
 }, { passive: true });
 
 gridEl.addEventListener('touchmove', e => {
-    if (!_touchState?.active) return;
+    if (!_touchState || !_touchState.active) return;
     e.preventDefault();
     const touch = e.touches[0];
     _touchState.clone.style.left = (touch.clientX - _touchState.clone.offsetWidth / 2) + 'px';
     _touchState.clone.style.top = (touch.clientY - _touchState.clone.offsetHeight / 2) + 'px';
     gridEl.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
-    const dragEl = target?.closest('[data-drag-index]');
+    const dragEl = target ? target.closest('[data-drag-index]') : null;
     if (dragEl && parseInt(dragEl.dataset.dragIndex) !== _touchState.idx) {
         dragEl.classList.add('drag-over');
     }
@@ -342,7 +342,7 @@ gridEl.addEventListener('touchend', e => {
     if (_touchState.active) {
         const touch = e.changedTouches[0];
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
-        const dragEl = target?.closest('[data-drag-index]');
+        const dragEl = target ? target.closest('[data-drag-index]') : null;
         if (dragEl) {
             const toIdx = parseInt(dragEl.dataset.dragIndex);
             if (toIdx !== _touchState.idx) {

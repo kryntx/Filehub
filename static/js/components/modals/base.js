@@ -3,8 +3,11 @@
 export function initModal(overlayId, { onClose } = {}) {
     const overlay = document.getElementById(overlayId);
 
-    overlay.querySelector('.modal-close')?.addEventListener('click', close);
-    overlay.querySelector('[id$="Cancel"]')?.addEventListener('click', close);
+    const closeBtn = overlay.querySelector('.modal-close');
+    if (closeBtn) closeBtn.addEventListener('click', close);
+
+    const cancelBtn = overlay.querySelector('[id$="Cancel"]');
+    if (cancelBtn) cancelBtn.addEventListener('click', close);
     overlay.addEventListener('click', e => { if (e.target === overlay) close(); });
 
     function close() {
