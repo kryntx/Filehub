@@ -232,7 +232,7 @@ function startUpload(index) {
 
     const xhr = new XMLHttpRequest();
     item.xhr = xhr;
-    xhr.timeout = 300000; // 5 min timeout — prevents truly stuck uploads
+    xhr.timeout = 3600000; // 1 hour timeout — large files on slow networks need it
 
     // Build query params: path, filename, offset (reliable — avoids custom-header issues)
     const params = new URLSearchParams();

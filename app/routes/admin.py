@@ -152,7 +152,6 @@ def delete():
 
 
 @bp.route('/api/order', methods=['PUT'])
-@require_password
 def save_order():
     data = request.get_json(silent=True) or {}
     sub = (data.get('path') or '').strip()

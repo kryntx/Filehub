@@ -73,8 +73,9 @@ def list_files():
         def sort_key(x):
             pos = order_map.get(x['name'])
             if pos is not None:
-                return (0, pos)
-            return (1, 0 if x['type'] == 'dir' else 1, x['name'].lower())
+                return (1, pos)
+            # 新文件（不在自定义排序中）排在最前
+            return (0, 0 if x['type'] == 'dir' else 1, x['name'].lower())
     else:
         def sort_key(x):
             return (0 if x['type'] == 'dir' else 1, x['name'].lower())

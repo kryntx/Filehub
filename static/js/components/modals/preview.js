@@ -6,6 +6,9 @@ import * as api from '../../api.js';
 import * as toast from '../toast.js';
 import { escapeHtml, enc } from '../../utils.js';
 import { prompt } from './password.js';
+import { createPlayer } from '../player.js';
+
+let playerInstance = null;
 
 const modal = initModal('previewModal', {
     onClose() {
@@ -16,6 +19,10 @@ const modal = initModal('previewModal', {
             el.removeAttribute('src');
             el.load();
         });
+        if (playerInstance) {
+            playerInstance.destroy();
+            playerInstance = null;
+        }
     },
 });
 const contentEl = document.getElementById('previewContent');
@@ -51,6 +58,10 @@ wrapToggle.addEventListener('click', () => {
 });
 
 export async function open(filename) {
+    if (playerInstance) {
+        playerInstance.destroy();
+        playerInstance = null;
+    }
     currentFilename = filename;
     isEditing = false;
     titleEl.textContent = filename;
@@ -79,7 +90,8 @@ export async function open(filename) {
     // Video preview
     if (['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.avi'].includes(ext)) {
         contentEl.className = 'preview-content preview-video';
-        contentEl.innerHTML = '<video controls autoplay src="' + api.downloadUrl(q) + '"></video>';
+        contentEl.innerHTML = '';
+        playerInstance = createPlayer(contentEl, api.downloadUrl(q));
         return;
     }
 

@@ -14,4 +14,5 @@ if __name__ == '__main__':
     if debug:
         app.run(host=host, port=port, debug=True, threaded=True)
     else:
-        serve(app, host=host, port=port, threads=8, connection_limit=1000)
+        serve(app, host=host, port=port, threads=8, connection_limit=1000,
+              max_request_body_size=32 * 1024 * 1024 * 1024)

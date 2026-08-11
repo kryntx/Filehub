@@ -88,7 +88,7 @@ export function saveFile(path, name, content) {
 }
 
 export function saveOrder(path, order) {
-    return request('PUT', '/api/order', { body: { path, order }, auth: true });
+    return request('PUT', '/api/order', { body: { path, order } });
 }
 
 export function deleteItem(path, name) {
