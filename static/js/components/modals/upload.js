@@ -5,7 +5,7 @@ import State from '../../state.js';
 import { formatSize, escapeHtml } from '../../utils.js';
 import { uploadFromUrl, fetchFiles } from '../../api.js';
 import * as toast from '../toast.js';
-import * as fileGrid from '../fileGrid.js';
+import * as fileGrid from '../fileGrid.js?v=8';
 
 const modal = initModal('uploadModal', {
     onClose() {

@@ -151,6 +151,13 @@ def delete():
     return jsonify({'success': True})
 
 
+@bp.route('/api/verify-password', methods=['POST'])
+@require_password
+def verify_password():
+    """Immediate password check for the login modal; failures count toward lockout."""
+    return jsonify({'success': True})
+
+
 @bp.route('/api/order', methods=['PUT'])
 def save_order():
     data = request.get_json(silent=True) or {}

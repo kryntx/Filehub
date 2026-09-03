@@ -3,15 +3,26 @@
 import State from './state.js';
 import { getCookie, formatSize } from './utils.js';
 import { init as initTheme } from './components/theme.js';
-import * as fileGrid from './components/fileGrid.js';
+import * as fileGrid from './components/fileGrid.js?v=8';
 import * as uploadModal from './components/modals/upload.js';
 import * as folderModal from './components/modals/folder.js';
 import * as newFileModal from './components/modals/newFile.js';
 import { prompt } from './components/modals/password.js';
 import { fetchStorageStats } from './api.js';
+import * as realtime from './realtime.js';
 
 /* ---- Init theme ---- */
 initTheme();
+
+/* ---- Realtime presence indicator ---- */
+realtime.onStatus(({ connected, online }) => {
+    const indicator = document.getElementById('onlineIndicator');
+    const count = document.getElementById('onlineCount');
+    count.textContent = String(online);
+    indicator.classList.toggle('offline', !connected);
+    indicator.classList.toggle('reconnecting', !connected);
+    indicator.title = connected ? (online + ' 人在线') : '连接断开，自动重连中…';
+});
 
 /* ---- Restore password from cookie ---- */
 const savedPwd = getCookie('uploadPassword');

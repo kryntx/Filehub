@@ -169,6 +169,28 @@ html.theme-transition::after {
 .header-left { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .header-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
 
+/* Online presence indicator */
+.online-indicator {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 5px 12px; border-radius: 999px;
+    background: var(--btn2-bg); border: 1px solid var(--btn2-border);
+    font-size: 12px; color: var(--text2); white-space: nowrap;
+    backdrop-filter: var(--surface-filter);
+    -webkit-backdrop-filter: var(--surface-filter);
+    transition: border-color var(--motion-med) var(--ease-soft), opacity var(--motion-med) var(--ease-soft);
+}
+.online-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #22c55e; box-shadow: 0 0 6px rgba(34,197,94,.7);
+    transition: background var(--motion-med) var(--ease-soft), box-shadow var(--motion-med) var(--ease-soft);
+}
+.online-indicator.offline .online-dot {
+    background: #ef4444; box-shadow: 0 0 6px rgba(239,68,68,.7);
+}
+.online-indicator.reconnecting .online-dot {
+    background: #f59e0b; box-shadow: 0 0 6px rgba(245,158,11,.7);
+}
+
 .theme-panel {
     display: flex; align-items: center; gap: 6px;
     padding: 4px; border-radius: var(--radius-lg);
@@ -316,6 +338,12 @@ html.theme-transition::after {
     opacity: 0.45;
     animation: dragSqueeze .42s cubic-bezier(.22,1,.36,1) infinite alternate;
 }
+.file-card.dragging-remote,
+.list-table tr.dragging-remote {
+    opacity: .45;
+    outline: 2px dashed #7b2ff7; outline-offset: -2px;
+}
+.file-card.dragging-remote { border-radius: 14px; }
 .file-card.drag-over {
     outline: 2px solid #7b2ff7; outline-offset: -2px; border-radius: 14px;
     animation: dragSlotPulse .36s cubic-bezier(.18,.89,.32,1.28);

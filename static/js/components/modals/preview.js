@@ -6,7 +6,7 @@ import * as api from '../../api.js';
 import * as toast from '../toast.js';
 import { escapeHtml, enc } from '../../utils.js';
 import { prompt } from './password.js';
-import { createPlayer } from '../player.js';
+import { createPlayer } from '../player.js?v=8';
 
 let playerInstance = null;
 
@@ -91,7 +91,7 @@ export async function open(filename) {
     if (['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.avi'].includes(ext)) {
         contentEl.className = 'preview-content preview-video';
         contentEl.innerHTML = '';
-        playerInstance = createPlayer(contentEl, api.downloadUrl(q));
+        playerInstance = createPlayer(contentEl, api.downloadUrl(q), q);
         return;
     }
 

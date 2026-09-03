@@ -7,8 +7,9 @@ import { escapeHtml, formatSize, formatTime, getIcon, isTextFile, enc, dec } fro
 import * as uploadModal from './modals/upload.js';
 import * as renameModal from './modals/rename.js';
 import { prompt } from './modals/password.js';
-import * as previewModal from './modals/preview.js';
+import * as previewModal from './modals/preview.js?v=8';
 import * as toast from './toast.js';
+import * as realtime from '../realtime.js';
 
 const gridEl = document.getElementById('fileGrid');
 const countEl = document.getElementById('fileCount');
@@ -18,6 +19,12 @@ const viewToggle = document.getElementById('viewToggle');
 
 let cachedFiles = [];
 let _dragIdx = -1;
+let _lastMove = { t: 0, idx: -1, side: '' };
+// 远端拖拽会话: { name: 被拖文件名, snapshot: 拖拽开始前的顺序, timer: 空闲/回滚定时器 }
+let _remoteDrag = null;
+
+const REMOTE_IDLE = 5000;   // 无后续 drag 事件视为拖拽中断，还原顺序
+const REMOTE_SETTLE = 1200; // drag.end 后等待 order 广播定稿的窗口
 
 /** Save current file order to server. */
 function saveOrder() {
@@ -235,6 +242,141 @@ viewToggle.addEventListener('click', () => {
     render(cachedFiles);
 });
 
+/* ---- Remote drag sync (realtime) ---- */
+
+function cardByName(name) {
+    const inner = gridEl.querySelector('[data-file="' + enc(name) + '"], [data-dir="' + enc(name) + '"]');
+    return inner ? inner.closest('[data-drag-index]') : null;
+}
+
+function clearRemoteIndicators() {
+    gridEl.querySelectorAll('.dragging-remote, .drag-over, .drag-over-before, .drag-over-after').forEach(el => {
+        el.classList.remove('dragging-remote', 'drag-over', 'drag-over-before', 'drag-over-after');
+    });
+}
+
+// 还原到拖拽开始前的顺序（拖拽中断、或 drag.end 后未收到 order 定稿）
+function rollbackRemote() {
+    if (!_remoteDrag) return;
+    const order = _remoteDrag.snapshot;
+    _remoteDrag = null;
+    applyRemoteOrder(order);
+}
+
+function armRemoteTimer(ms, fn) {
+    if (!_remoteDrag) return;
+    clearTimeout(_remoteDrag.timer);
+    _remoteDrag.timer = setTimeout(() => {
+        if (_remoteDrag) fn();
+    }, ms);
+}
+
+function applyRemoteStart(ev) {
+    // 上一个会话可能因消息丢失未收尾，先还原再开始新的
+    rollbackRemote();
+    clearRemoteIndicators();
+    const el = cardByName(ev.name) || gridEl.querySelector('[data-drag-index="' + ev.idx + '"]');
+    if (el) el.classList.add('dragging-remote');
+    _remoteDrag = { name: ev.name, snapshot: cachedFiles.map(f => f.name), timer: 0 };
+    armRemoteTimer(REMOTE_IDLE, rollbackRemote);
+}
+
+// 把被拖卡片实时挪到目标卡片前/后，cachedFiles 与 DOM 同步，位置实时跟手
+function moveRemoteItem(targetName, side) {
+    if (!_remoteDrag || !_remoteDrag.name || !targetName || _remoteDrag.name === targetName) return;
+    const from = cardByName(_remoteDrag.name);
+    const to = cardByName(targetName);
+    if (!from || !to) return;
+
+    const names = cachedFiles.map(f => f.name);
+    const fi = names.indexOf(_remoteDrag.name);
+    const ti = names.indexOf(targetName);
+    if (fi < 0 || ti < 0) return;
+    let insertIdx = side === 'after' ? ti + 1 : ti;
+    if (fi < insertIdx) insertIdx--;
+    if (insertIdx === fi) return; // 相对位置未变，避免无谓跳动
+
+    const [moved] = cachedFiles.splice(fi, 1);
+    cachedFiles.splice(insertIdx, 0, moved);
+
+    const parent = from.parentNode;
+    if (side === 'after') {
+        const next = to.nextElementSibling;
+        if (next) parent.insertBefore(from, next);
+        else parent.appendChild(from);
+    } else {
+        parent.insertBefore(from, to);
+    }
+    syncDragIndices();
+}
+
+// DOM 节点移动后刷新 data-drag-index，否则本端后续拖拽会按旧索引定位
+function syncDragIndices() {
+    const root = gridEl.querySelector('tbody') || gridEl;
+    Array.from(root.children).filter(el =>
+        el.classList.contains('file-card') || el.tagName === 'TR')
+        .forEach((el, i) => { el.dataset.dragIndex = String(i); });
+}
+
+function applyRemoteMove(ev) {
+    gridEl.querySelectorAll('.drag-over, .drag-over-before, .drag-over-after').forEach(el => {
+        el.classList.remove('drag-over', 'drag-over-before', 'drag-over-after');
+    });
+    const target = cardByName(ev.name) || gridEl.querySelector('[data-drag-index="' + ev.idx + '"]');
+    if (!target) return;
+    target.classList.add('drag-over', ev.side === 'after' ? 'drag-over-after' : 'drag-over-before');
+    if (_remoteDrag) {
+        armRemoteTimer(REMOTE_IDLE, rollbackRemote);
+        moveRemoteItem(ev.name, ev.side);
+    }
+}
+
+function applyRemoteOrder(order) {
+    const pos = new Map(order.map((n, i) => [n, i]));
+    cachedFiles.sort((a, b) => {
+        const pa = pos.get(a.name), pb = pos.get(b.name);
+        if (pa === undefined && pb === undefined) return a.name.localeCompare(b.name);
+        if (pa === undefined) return 1;
+        if (pb === undefined) return -1;
+        return pa - pb;
+    });
+    render(cachedFiles);
+}
+
+realtime.on('drag.start', (data, p) => {
+    if (data.path !== State.currentPath) return;
+    applyRemoteStart(data);
+});
+
+realtime.on('drag.move', (data, p) => {
+    if (data.path !== State.currentPath) return;
+    applyRemoteMove(data);
+});
+
+realtime.on('drag.end', data => {
+    if (data.path !== State.currentPath) return;
+    clearRemoteIndicators();
+    if (!_remoteDrag) return;
+    // A 端正常落点会广播 order 定稿；若拖回原位则无 order，超时后还原快照
+    armRemoteTimer(REMOTE_SETTLE, rollbackRemote);
+});
+
+realtime.on('order', data => {
+    if (data.path !== State.currentPath) return;
+    if (_remoteDrag) {
+        clearTimeout(_remoteDrag.timer);
+        _remoteDrag = null;
+    }
+    applyRemoteOrder(data.order);
+});
+
+function sendDragMove(idx, side) {
+    const now = performance.now();
+    if (now - _lastMove.t < 50 && _lastMove.idx === idx && _lastMove.side === side) return;
+    _lastMove = { t: now, idx, side };
+    realtime.send('drag.move', { path: State.currentPath, idx, side, name: cachedFiles[idx] ? cachedFiles[idx].name : '' });
+}
+
 /* ---- Drag and drop sorting ---- */
 
 function clearDrag() {
@@ -258,6 +400,7 @@ gridEl.addEventListener('dragstart', e => {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', '');
     el.classList.add('dragging');
+    realtime.send('drag.start', { path: State.currentPath, idx: _dragIdx, name: cachedFiles[_dragIdx] ? cachedFiles[_dragIdx].name : '' });
 });
 
 gridEl.addEventListener('dragenter', e => {
@@ -277,6 +420,7 @@ gridEl.addEventListener('dragover', e => {
     const el = e.target.closest('[data-drag-index]');
     if (!el || _dragIdx < 0 || parseInt(el.dataset.dragIndex) === _dragIdx) return;
     markDragTarget(el, e.clientY);
+    sendDragMove(parseInt(el.dataset.dragIndex), el.classList.contains('drag-over-after') ? 'after' : 'before');
 });
 
 gridEl.addEventListener('dragleave', e => {
@@ -292,6 +436,7 @@ gridEl.addEventListener('drop', e => {
     const el = e.target.closest('[data-drag-index]');
     if (!el || _dragIdx < 0) return;
     const toIdx = parseInt(el.dataset.dragIndex);
+    const draggedName = cachedFiles[_dragIdx] ? cachedFiles[_dragIdx].name : '';
     if (toIdx !== _dragIdx) {
         const rect = el.getBoundingClientRect();
         const midY = rect.top + rect.height / 2;
@@ -304,9 +449,16 @@ gridEl.addEventListener('drop', e => {
         saveOrder();
     }
     clearDrag();
+    realtime.send('drag.end', { path: State.currentPath, name: draggedName });
+    realtime.send('order', { path: State.currentPath, order: cachedFiles.map(f => f.name) });
 });
 
-gridEl.addEventListener('dragend', clearDrag);
+gridEl.addEventListener('dragend', e => {
+    if (_dragIdx >= 0 && cachedFiles[_dragIdx]) {
+        realtime.send('drag.end', { path: State.currentPath, name: cachedFiles[_dragIdx].name });
+    }
+    clearDrag();
+});
 
 /* ---- Touch long-press drag support ---- */
 
@@ -331,6 +483,7 @@ gridEl.addEventListener('touchstart', e => {
             document.body.appendChild(clone);
             _touchState.clone = clone;
             _touchState.active = true;
+            realtime.send('drag.start', { path: State.currentPath, idx: _touchState.idx, name: cachedFiles[_touchState.idx] ? cachedFiles[_touchState.idx].name : '' });
         }, 400)
     };
 }, { passive: true });
@@ -348,6 +501,7 @@ gridEl.addEventListener('touchmove', e => {
     const dragEl = target ? target.closest('[data-drag-index]') : null;
     if (dragEl && parseInt(dragEl.dataset.dragIndex) !== _touchState.idx) {
         markDragTarget(dragEl, touch.clientY);
+        sendDragMove(parseInt(dragEl.dataset.dragIndex), dragEl.classList.contains('drag-over-after') ? 'after' : 'before');
     }
 }, { passive: false });
 
@@ -358,6 +512,7 @@ gridEl.addEventListener('touchend', e => {
         const touch = e.changedTouches[0];
         const target = document.elementFromPoint(touch.clientX, touch.clientY);
         const dragEl = target ? target.closest('[data-drag-index]') : null;
+        const draggedName = cachedFiles[_touchState.idx] ? cachedFiles[_touchState.idx].name : '';
         if (dragEl) {
             const toIdx = parseInt(dragEl.dataset.dragIndex);
             if (toIdx !== _touchState.idx) {
@@ -372,6 +527,8 @@ gridEl.addEventListener('touchend', e => {
                 saveOrder();
             }
         }
+        realtime.send('drag.end', { path: State.currentPath, name: draggedName });
+        realtime.send('order', { path: State.currentPath, order: cachedFiles.map(f => f.name) });
     }
     if (_touchState.clone) _touchState.clone.remove();
     _touchState = null;
@@ -383,6 +540,9 @@ gridEl.addEventListener('touchend', e => {
 gridEl.addEventListener('touchcancel', () => {
     if (_touchState) {
         clearTimeout(_touchState.timer);
+        if (_touchState.active && cachedFiles[_touchState.idx]) {
+            realtime.send('drag.end', { path: State.currentPath, name: cachedFiles[_touchState.idx].name });
+        }
         if (_touchState.clone) _touchState.clone.remove();
         _touchState = null;
     }

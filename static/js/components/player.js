@@ -1,4 +1,6 @@
-/** Custom video player. */
+/** Custom video player with realtime playback sync. */
+
+import * as realtime from '../realtime.js';
 
 const ICONS = {
     play: '▶',
@@ -9,7 +11,19 @@ const ICONS = {
     exitFullscreen: '🗗',
 };
 
-export function createPlayer(container, src) {
+let current = null;
+
+realtime.on('player.state', data => {
+    if (!current || current.key !== data.src) return;
+    current.applyRemote(data);
+});
+
+realtime.on('player.open', data => {
+    if (!current || current.key !== data.src) return;
+    current.sendSnapshot();
+});
+
+export function createPlayer(container, src, syncKey = null) {
     container.innerHTML = `
         <div class="player">
             <video class="player-video" src="${src}" preload="metadata" playsinline></video>
@@ -66,6 +80,11 @@ export function createPlayer(container, src) {
     let seeking = false;
     let duration = 0;
     let lastVolume = 1;
+    const sync = syncKey !== null;
+    let syncReady = !sync;
+    let pendingState = null;
+    let openTimer = null;
+    let lastBeat = 0;
 
     function fmt(s) {
         if (!isFinite(s)) return '0:00';
@@ -112,6 +131,48 @@ export function createPlayer(container, src) {
         thumb.style.left = (pct / 10) + '%';
     }
 
+    /* ---- Realtime sync ---- */
+
+    function sendSnapshot() {
+        if (!syncReady) return;
+        lastBeat = performance.now();
+        realtime.send('player.state', {
+            src: syncKey,
+            playing: !video.paused,
+            time: video.currentTime || 0,
+            rate: video.playbackRate,
+        });
+    }
+
+    function applyRemote(st) {
+        syncReady = true;
+        clearTimeout(openTimer);
+        if (!duration) {
+            // metadata 未加载：缓存最新一条，loadedmetadata 后应用
+            pendingState = st;
+            return;
+        }
+        if (typeof st.rate === 'number' && isFinite(st.rate) && st.rate > 0) {
+            video.playbackRate = st.rate;
+            speedSelect.value = String(st.rate);
+        }
+        if (typeof st.time === 'number' && isFinite(st.time)) {
+            const target = Math.min(st.time, duration);
+            if (Math.abs(video.currentTime - target) > 2) {
+                video.currentTime = target;
+            }
+        }
+        if (st.playing === true && video.paused) {
+            video.play().catch(() => {});
+        } else if (st.playing === false && !video.paused) {
+            video.pause();
+        }
+    }
+
+    if (sync) {
+        openTimer = setTimeout(() => { syncReady = true; }, 2000);
+    }
+
     /* ---- Play / pause ---- */
 
     function togglePlay() {
@@ -122,8 +183,8 @@ export function createPlayer(container, src) {
         }
     }
 
-    video.addEventListener('play', () => { setPlaying(true); showControls(); });
-    video.addEventListener('pause', () => { setPlaying(false); showControls(true); });
+    video.addEventListener('play', () => { setPlaying(true); showControls(); sendSnapshot(); });
+    video.addEventListener('pause', () => { setPlaying(false); showControls(true); sendSnapshot(); });
     video.addEventListener('ended', () => { setPlaying(false); bigPlay.classList.remove('hidden'); showControls(true); });
     video.addEventListener('waiting', () => { loading.style.display = 'flex'; });
     video.addEventListener('playing', () => { loading.style.display = 'none'; });
@@ -136,8 +197,15 @@ export function createPlayer(container, src) {
         duration = video.duration;
         updateTime();
         showControls(true);
+        if (pendingState) {
+            applyRemote(pendingState);
+            pendingState = null;
+        }
     });
-    video.addEventListener('timeupdate', updateTime);
+    video.addEventListener('timeupdate', () => {
+        updateTime();
+        if (!video.paused && performance.now() - lastBeat >= 5000) sendSnapshot();
+    });
     video.addEventListener('progress', () => {
         if (video.buffered.length) {
             const end = video.buffered.end(video.buffered.length - 1);
@@ -165,6 +233,7 @@ export function createPlayer(container, src) {
     seek.addEventListener('change', () => {
         seekTo(parseInt(seek.value));
         seeking = false;
+        sendSnapshot();
     });
 
     /* ---- Volume ---- */
@@ -184,6 +253,7 @@ export function createPlayer(container, src) {
 
     speedSelect.addEventListener('change', () => {
         video.playbackRate = parseFloat(speedSelect.value);
+        sendSnapshot();
     });
 
     /* ---- Fullscreen ---- */
@@ -242,12 +312,23 @@ export function createPlayer(container, src) {
         showControls(true);
     });
 
-    return {
+    const api = {
+        key: syncKey,
+        sendSnapshot,
+        applyRemote,
         destroy() {
+            if (sync) realtime.send('player.close', { src: syncKey });
+            clearTimeout(openTimer);
+            if (current === api) current = null;
             video.pause();
             video.removeAttribute('src');
             video.load();
             container.innerHTML = '';
         },
     };
+    if (sync) {
+        realtime.send('player.open', { src: syncKey });
+        current = api;
+    }
+    return api;
 }

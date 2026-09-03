@@ -13,14 +13,39 @@ document.getElementById('passwordInput').addEventListener('keydown', e => {
     if (e.key === 'Enter') document.getElementById('passwordModalConfirm').click();
 });
 
-document.getElementById('passwordModalConfirm').addEventListener('click', () => {
+document.getElementById('passwordModalConfirm').addEventListener('click', async () => {
     const pwd = document.getElementById('passwordInput').value.trim();
     const errEl = document.getElementById('passwordError');
+    const btn = document.getElementById('passwordModalConfirm');
     if (!pwd) {
         errEl.textContent = '请输入密码';
         errEl.style.display = 'block';
         return;
     }
+    btn.disabled = true;
+    let ok = false;
+    try {
+        const res = await fetch('/api/verify-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'x-upload-password': pwd },
+            body: '{}',
+        });
+        if (!res.ok) {
+            let msg = '密码错误';
+            try { const d = await res.json(); msg = d.error || msg; } catch {}
+            errEl.textContent = msg;
+            errEl.style.display = 'block';
+            return;
+        }
+        ok = true;
+    } catch {
+        errEl.textContent = '网络错误，请重试';
+        errEl.style.display = 'block';
+        return;
+    } finally {
+        btn.disabled = false;
+    }
+    if (!ok) return;
     setEndOfDayCookie('uploadPassword', pwd);
     State.password = pwd;
     modal.close();

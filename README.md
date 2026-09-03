@@ -10,9 +10,16 @@ cd /home/admin/Code/web && python3 server.py
 ```
 
 ## 密码机制
-- 默认密码：`8888`（可通过环境变量 `UPLOAD_PASSWORD` 覆盖）
+- 密码不以明文存储：后端保存 PBKDF2-SHA256 加盐哈希（`pbkdf2_sha256$迭代次数$盐$摘要`）
+- 内置默认密码为 `@wauiefcnua5516.`，其哈希内置于 `config.py`
+- 可通过环境变量覆盖：
+  - `PASSWORD_HASH`：直接指定哈希串
+  - `UPLOAD_PASSWORD`：指定明文密码（启动时哈希一次，不落盘）
+- 校验使用恒定时间比较（`hmac.compare_digest`），防时序攻击
+- 防爆破：同一 IP 连续输错 5 次锁定 15 分钟（内存限流器，重启后清零）
+- 密码弹框即时校验：输入后点击确认立即调用 `/api/verify-password`，错误当场提示且不关闭弹框，输错同样计入限流
 - 所有写操作（上传、新建文件夹/文件、重命名、删除、编辑保存、URL下载）都需要在 HTTP Header 中传 `x-upload-password`
-- 前端输入密码后写入 Cookie（当日过期），后续操作自动附带
+- 前端输入密码后写入 Cookie（当日过期，HTTPS 下附加 `Secure` 标记），后续操作自动附带
 
 ## 后端 API
 
@@ -28,6 +35,7 @@ cd /home/admin/Code/web && python3 server.py
 | POST | `/api/newfile` | 创建空文件 | `{path, name}` |
 | PUT | `/api/rename` | 重命名文件或文件夹，目标已存在时自动加 `_1/_2` | `{path, name, newName}` |
 | PUT | `/api/save` | 保存文本文件内容 | `{path, name, content}` |
+| POST | `/api/verify-password` | 密码即时校验（供弹框使用，需密码） | `{}` |
 | DELETE | `/api/delete` | 删除文件或空文件夹（非空拒绝） | `{path, name}` |
 
 路径安全：所有接口使用 `resolve()` 函数做 `os.path.normpath` + 前缀校验防止路径遍历。

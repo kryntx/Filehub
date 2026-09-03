@@ -67,9 +67,11 @@ export function dec(s) {
 export function setEndOfDayCookie(name, value) {
     const now = new Date();
     const end = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
-    document.cookie =
+    let cookie =
         encodeURIComponent(name) + '=' + encodeURIComponent(value) +
         '; expires=' + end.toUTCString() + '; path=/; SameSite=Lax';
+    if (location.protocol === 'https:') cookie += '; Secure';
+    document.cookie = cookie;
 }
 
 export function getCookie(name) {

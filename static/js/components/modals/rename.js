@@ -4,7 +4,7 @@ import { initModal } from './base.js';
 import State from '../../state.js';
 import * as api from '../../api.js';
 import * as toast from '../toast.js';
-import * as fileGrid from '../fileGrid.js';
+import * as fileGrid from '../fileGrid.js?v=8';
 import { prompt } from './password.js';
 
 const modal = initModal('renameModal');
